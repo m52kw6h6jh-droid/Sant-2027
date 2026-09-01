@@ -114,14 +114,6 @@
     font-weight:700; font-size:13px; cursor:pointer; color:var(--ink);
   }
 
-  /* ZONES / SILHOUETTE */
-  .zones-wrap{ display:flex; gap:18px; flex-wrap:wrap; justify-content:center; }
-  .zone-block{ text-align:center; }
-  .zone-block h3{ font-size:13px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:8px;}
-  .zone-hit{ cursor:pointer; transition: fill 0.15s; }
-  .pain-scale{ display:flex; gap:4px; justify-content:center; margin-top:10px; }
-  .pain-scale div{ width:22px; height:22px; border-radius:6px; cursor:pointer; border:1px solid var(--line); }
-
   /* HISTORY */
   .entry{
     display:flex; justify-content:space-between; align-items:center;
@@ -149,6 +141,54 @@
     background: var(--amber-light); border-left:4px solid var(--amber);
     padding:10px 14px; border-radius:8px; font-size:13px; color:#6b4f14; margin-bottom:16px;
   }
+
+  /* PHASE */
+  .phase-card{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; }
+  .phase-label{ font-weight:800; font-size:15px; }
+  .phase-sub{ font-size:13px; color:var(--ink-soft); margin-top:2px; }
+
+  /* WEEK / PLANNING */
+  .week-nav{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .week-nav .btn-secondary{ padding:6px 14px; font-size:16px; line-height:1; }
+  .week-title{ font-weight:800; font-size:15px; text-align:center; flex:1; }
+  .week-stats{
+    display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;
+  }
+  .week-stats div{
+    flex:1; min-width:88px; background:var(--stone); border-radius:10px; padding:8px 10px; text-align:center;
+  }
+  .week-stats b{ display:block; font-size:19px; }
+  .week-stats span{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+
+  .day-card{
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px 16px; margin-bottom:10px;
+  }
+  .day-card.is-today{ border-color:var(--ink); border-width:2px; }
+  .day-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-weight:800; font-size:14px; margin-bottom:8px;
+  }
+  .day-head .dl{ font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .slot{
+    display:flex; align-items:center; gap:10px;
+    padding:8px 0; border-top:1px solid var(--line); font-size:14px;
+  }
+  .slot:first-of-type{ border-top:none; }
+  .slot .ico{ font-size:16px; }
+  .slot .txt{ flex:1; }
+  .slot .txt small{ display:block; font-size:12px; color:var(--ink-soft); }
+  .slot .st{ font-size:11px; font-weight:800; text-transform:uppercase; padding:2px 7px; border-radius:6px; }
+  .st-done{ background:var(--moss-light); color:var(--moss); }
+  .st-plan{ background:var(--slate-light); color:var(--slate); }
+  .st-commute{ background:var(--stone-deep); color:var(--ink-soft); }
+  .slot .x{ background:none; border:none; color:var(--clay); font-size:16px; cursor:pointer; padding:0 2px; }
+  .slot .attach{
+    background:var(--slate-light); border:1px solid var(--slate); color:var(--slate);
+    font-size:11px; font-weight:800; padding:4px 8px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  }
+  .slot .attach:active{ opacity:0.7; }
+  .day-empty{ font-size:13px; color:var(--ink-soft); padding:4px 0; }
 </style>
 </head>
 <body>
@@ -169,18 +209,92 @@
     </div>
   </div>
 
+  <div class="card phase-card">
+    <div>
+      <div class="phase-label" id="phaseLabel">—</div>
+      <div class="phase-sub" id="phaseSub"></div>
+    </div>
+    <button class="btn-secondary" onclick="togglePhaseEdit()">Modifier</button>
+  </div>
+  <div class="card" id="phaseEdit" style="display:none;">
+    <label>Phase actuelle</label>
+    <select id="phaseSel">
+      <option value="preop">1 · Avant l'opération</option>
+      <option value="recup">2 · Récupération post-op</option>
+      <option value="reprise">3 · Reprise progressive</option>
+      <option value="plein">4 · Plein volume</option>
+    </select>
+    <label>Date de l'opération</label>
+    <input type="date" id="opDate">
+    <button class="btn-primary" onclick="savePhase()">Enregistrer</button>
+  </div>
+
   <div class="tabs">
     <div class="tab active" data-tab="today">Aujourd'hui</div>
-    <div class="tab" data-tab="zones">Douleurs</div>
+    <div class="tab" data-tab="week">Semaine</div>
     <div class="tab" data-tab="history">Historique</div>
+  </div>
+
+  <!-- SEMAINE / PLANNING -->
+  <div class="panel" id="panel-week">
+    <div class="card">
+      <div class="week-nav">
+        <button class="btn-secondary" onclick="shiftWeek(-1)">‹</button>
+        <div class="week-title" id="weekTitle"></div>
+        <button class="btn-secondary" onclick="shiftWeek(1)">›</button>
+      </div>
+      <div class="week-stats" id="weekStats"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:14px; margin-bottom:10px;">Planifier une séance</h3>
+      <label>Jour</label>
+      <select id="planDay"></select>
+      <div class="row">
+        <div>
+          <label>Type</label>
+          <select id="planType">
+            <option value="trail">🏔️ Trail</option>
+            <option value="escalade">🧗 Escalade</option>
+            <option value="renfo">💪 Renforcement</option>
+            <option value="recup">🧘 Récup / étirements</option>
+          </select>
+        </div>
+        <div>
+          <label>Durée prévue (min)</label>
+          <input type="number" id="planDuree" placeholder="60" min="0">
+        </div>
+      </div>
+      <label>Intention (optionnel)</label>
+      <input type="text" id="planNote" placeholder="Sortie longue, bloc, gainage...">
+      <button class="btn-primary" onclick="addPlan()">Ajouter au planning</button>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:14px; margin-bottom:4px;">Rituel du dimanche</h3>
+      <p style="margin:0 0 10px; font-size:13px; color:var(--ink-soft);">Copie ta situation, colle-la dans Claude, puis reviens coller le plan reçu.</p>
+      <button class="btn-secondary" id="btnSituation" style="width:100%; margin-bottom:8px;" onclick="copySituation()">📋 Copier ma situation</button>
+      <button class="btn-secondary" style="width:100%;" onclick="openPlanImport()">📥 Importer un plan</button>
+      <div id="planImportZone" style="display:none; margin-top:10px;">
+        <textarea id="planPaste" placeholder="Colle ici le plan (format JSON) reçu de Claude" style="min-height:110px;"></textarea>
+        <button class="btn-primary" onclick="applyPlan()">Appliquer le plan</button>
+      </div>
+    </div>
+
+    <div id="weekDays"></div>
+    <input type="file" id="attachFile" accept="application/json" style="display:none" onchange="handleAttach(event)">
+
+    <div class="info-box">Le vélo boulot (10 km, lun–jeu) s'affiche automatiquement. Il compte comme déplacement régulier, pas comme charge d'entraînement — sinon il masquerait les vraies hausses de charge.</div>
   </div>
 
   <!-- TODAY / ENTRY -->
   <div class="panel active" id="panel-today">
     <div class="card">
-      <label>Importer une séance Suunto (.json)</label>
-      <input type="file" id="suuntoFile" accept="application/json" onchange="handleSuuntoImport(event)">
+      <label>Importer tes séances Suunto (.json)</label>
+      <p style="margin:0 0 8px; font-size:13px; color:var(--ink-soft);">Tu peux sélectionner plusieurs fichiers d'un coup — trail comme escalade.</p>
+      <input type="file" id="suuntoFile" accept="application/json" multiple onchange="handleSuuntoImport(event)">
       <div id="importInfo" style="display:none; margin-top:8px; font-size:13px; color:var(--moss); background:var(--moss-light); padding:8px 10px; border-radius:8px;"></div>
+      <div id="queueBox" style="display:none; margin-top:10px;"></div>
     </div>
     <div class="card">
       <label>Discipline</label>
@@ -221,54 +335,6 @@
     <div class="info-box">Charge = durée × intensité (RPE). L'ACWR compare ta charge des 7 derniers jours à ta moyenne des 28 derniers jours. Zone sûre : 0.8 – 1.3.</div>
   </div>
 
-  <!-- ZONES -->
-  <div class="panel" id="panel-zones">
-    <div class="card">
-      <p style="margin-top:0; font-size:13px; color:var(--ink-soft);">Clique une zone, puis un niveau de douleur (0 = rien, 5 = intense). Suivi dédié : loges (mollets/tibias) et cervicales.</p>
-      <div class="zones-wrap">
-        <div class="zone-block">
-          <h3>Nuque</h3>
-          <svg width="80" height="120" viewBox="0 0 80 120">
-            <circle cx="40" cy="20" r="16" fill="#EEE" stroke="var(--line)"/>
-            <rect class="zone-hit" data-zone="cervicales" x="26" y="34" width="28" height="24" rx="6" fill="#EEE" stroke="var(--line)"/>
-            <rect x="18" y="58" width="44" height="55" rx="8" fill="#F5F3EE" stroke="var(--line)"/>
-          </svg>
-          <div class="pain-scale" data-zone="cervicales"></div>
-        </div>
-        <div class="zone-block">
-          <h3>Jambes (loges)</h3>
-          <svg width="70" height="140" viewBox="0 0 70 140">
-            <rect x="10" y="0" width="50" height="40" rx="8" fill="#F5F3EE" stroke="var(--line)"/>
-            <rect class="zone-hit" data-zone="loge_g" x="8" y="45" width="22" height="55" rx="8" fill="#EEE" stroke="var(--line)"/>
-            <rect class="zone-hit" data-zone="loge_d" x="40" y="45" width="22" height="55" rx="8" fill="#EEE" stroke="var(--line)"/>
-          </svg>
-          <div style="display:flex; gap:16px; justify-content:center;">
-            <div>
-              <div style="font-size:11px; color:var(--ink-soft);">Gauche</div>
-              <div class="pain-scale" data-zone="loge_g"></div>
-            </div>
-            <div>
-              <div style="font-size:11px; color:var(--ink-soft);">Droite</div>
-              <div class="pain-scale" data-zone="loge_d"></div>
-            </div>
-          </div>
-        </div>
-        <div class="zone-block">
-          <h3>Doigts / avant-bras</h3>
-          <svg width="80" height="90" viewBox="0 0 80 90">
-            <rect x="30" y="30" width="20" height="50" rx="8" fill="#F5F3EE" stroke="var(--line)"/>
-            <rect class="zone-hit" data-zone="avantbras" x="18" y="5" width="44" height="30" rx="10" fill="#EEE" stroke="var(--line)"/>
-          </svg>
-          <div class="pain-scale" data-zone="avantbras"></div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <h3 style="font-size:14px; margin-bottom:8px;">État actuel des zones</h3>
-      <div id="zonesSummary"></div>
-    </div>
-  </div>
-
   <!-- HISTORY -->
   <div class="panel" id="panel-history">
     <div class="card">
@@ -282,10 +348,7 @@
   </div>
 
   <footer>
-    <button class="btn-secondary" onclick="exportData()">⬇ Exporter (JSON)</button>
-    <button class="btn-secondary" onclick="document.getElementById('importFile').click()">⬆ Importer</button>
-    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
-    <p>Données stockées localement dans ton navigateur. Exporte régulièrement pour ne rien perdre.</p>
+    <p>Données stockées dans ce navigateur, sur cet appareil.</p>
   </footer>
 
 </div>
@@ -319,35 +382,94 @@ function setType(t){
   document.getElementById('muScale').style.display = t==='escalade' ? 'block' : 'none';
 }
 
-// ---------- SUUNTO IMPORT ----------
+// ---------- SUUNTO IMPORT (multi-fichiers) ----------
 let importedDate = null;
-function handleSuuntoImport(ev){
-  const file = ev.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
+let importQueue = [];   // séances lues, en attente de validation
+let queueIndex = 0;
+
+function readFileAsText(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = ()=>rej(new Error('lecture impossible'));
+    r.readAsText(file);
+  });
+}
+
+async function handleSuuntoImport(ev){
+  const files = [...ev.target.files];
+  if(!files.length) return;
+  const lues = [], erreurs = [];
+
+  for(const f of files){
     try{
-      const data = JSON.parse(reader.result);
+      const data = JSON.parse(await readFileAsText(f));
       const h = data.DeviceLog && data.DeviceLog.Header;
-      if(!h){ alert('Structure inattendue — pas de DeviceLog.Header trouvé.'); return; }
-      const dureeMin = Math.round((h.Duration||0)/60);
-      const ascent = Math.round(h.Ascent||0);
-      document.getElementById('duree').value = dureeMin;
-      document.getElementById('deniv').value = ascent;
-      importedDate = h.DateTime || null;
-      // suggestion de RPE à partir du Peak Training Effect (échelle Suunto 0-5)
-      if(h.PeakTrainingEffect){
-        const suggestedRpe = Math.min(10, Math.max(1, Math.round(h.PeakTrainingEffect * 2)));
-        document.getElementById('rpe').value = suggestedRpe;
-        document.getElementById('rpeVal').textContent = suggestedRpe;
-      }
-      const info = document.getElementById('importInfo');
-      info.style.display = 'block';
-      const d = importedDate ? new Date(importedDate).toLocaleDateString('fr-FR') : '';
-      info.textContent = `Importé : ${dureeMin} min · ${ascent} m D+ · ${d}. Vérifie le type et l'intensité, puis ajoute la séance.`;
-    }catch(e){ alert('Fichier JSON invalide ou format non reconnu.'); }
-  };
-  reader.readAsText(file);
+      if(!h){ erreurs.push(f.name); continue; }
+      lues.push({
+        duree: Math.round((h.Duration||0)/60),
+        deniv: Math.round(h.Ascent||0),
+        date: h.DateTime || null,
+        rpe: h.PeakTrainingEffect
+          ? Math.min(10, Math.max(1, Math.round(h.PeakTrainingEffect*2)))
+          : 5
+      });
+    }catch(e){ erreurs.push(f.name); }
+  }
+
+  // plus ancienne d'abord : on saisit dans l'ordre de la semaine
+  lues.sort((a,b)=> new Date(a.date||0) - new Date(b.date||0));
+
+  importQueue = lues;
+  queueIndex = 0;
+
+  const info = document.getElementById('importInfo');
+  info.style.display = 'block';
+  let msg = `${lues.length} séance${lues.length>1?'s':''} lue${lues.length>1?'s':''}.`;
+  if(erreurs.length) msg += ` ${erreurs.length} fichier(s) non reconnu(s) : ${erreurs.join(', ')}.`;
+  info.textContent = msg;
+
+  if(lues.length) loadFromQueue(0);
+  else renderQueue();
+}
+
+function loadFromQueue(i){
+  const s = importQueue[i];
+  if(!s) return;
+  queueIndex = i;
+  document.getElementById('duree').value = s.duree;
+  document.getElementById('deniv').value = s.deniv;
+  document.getElementById('rpe').value = s.rpe;
+  document.getElementById('rpeVal').textContent = s.rpe;
+  importedDate = s.date;
+  renderQueue();
+}
+
+function renderQueue(){
+  const box = document.getElementById('queueBox');
+  if(!importQueue.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px; font-weight:700; margin-bottom:6px;">À valider — clique une séance, choisis le type, puis « Ajouter »</div>' +
+    importQueue.map((s,i)=>{
+      const d = s.date ? new Date(s.date).toLocaleDateString('fr-FR',{weekday:'short', day:'2-digit', month:'2-digit'}) : '?';
+      const on = i===queueIndex;
+      return `<div onclick="loadFromQueue(${i})" style="cursor:pointer; padding:7px 10px; margin-bottom:4px; border-radius:8px; font-size:13px;
+        border:${on?'2px solid var(--ink)':'1px solid var(--line)'}; background:${on?'var(--stone)':'#fff'};">
+        ${d} · ${s.duree} min${s.deniv?' · '+s.deniv+' m D+':''} · RPE ${s.rpe}</div>`;
+    }).join('');
+}
+
+// retire la séance validée de la file et enchaîne sur la suivante
+function advanceQueue(){
+  if(!importQueue.length) return;
+  importQueue.splice(queueIndex, 1);
+  if(!importQueue.length){
+    document.getElementById('queueBox').style.display='none';
+    document.getElementById('importInfo').textContent = 'Toutes les séances importées ont été ajoutées.';
+    document.getElementById('suuntoFile').value='';
+    return;
+  }
+  loadFromQueue(Math.min(queueIndex, importQueue.length-1));
 }
 
 // ---------- ADD ENTRY ----------
@@ -366,16 +488,372 @@ function addEntry(){
   if(currentType==='trail') entry.deniv = parseFloat(document.getElementById('deniv').value) || 0;
   if(currentType==='escalade') entry.mur = document.getElementById('muType').value;
   state.entries.push(entry);
+  document.getElementById('note').value='';
+  importedDate = null;
+
+  const restait = importQueue.length > 0;
+  if(restait){
+    // enchaîne sur la séance suivante de la file, on reste sur l'onglet
+    advanceQueue();
+    save();
+    return;
+  }
   document.getElementById('duree').value='';
   document.getElementById('deniv').value='';
-  document.getElementById('note').value='';
   document.getElementById('rpe').value=5;
   document.getElementById('rpeVal').textContent=5;
-  importedDate = null;
   document.getElementById('importInfo').style.display='none';
   document.getElementById('suuntoFile').value='';
   save();
-  document.querySelector('.tab[data-tab="history"]').click();
+  document.querySelector('.tab[data-tab="week"]').click();
+}
+
+// ---------- PHASE ----------
+if(!state.phase) state.phase = {nom:'preop', opDate:'2026-09-22'};
+
+const PHASE_META = {
+  preop:   {nom:'Avant l\'opération',      note:'Maintenir la forme, éviter toute blessure'},
+  recup:   {nom:'Récupération post-op',    note:'Repos jambes. Haut du corps selon avis médical'},
+  reprise: {nom:'Reprise progressive',     note:'Charge par paliers, seuils resserrés'},
+  plein:   {nom:'Plein volume',            note:'Objectifs de performance'}
+};
+
+function togglePhaseEdit(){
+  const el = document.getElementById('phaseEdit');
+  const ouvert = el.style.display !== 'none';
+  el.style.display = ouvert ? 'none' : 'block';
+  if(!ouvert){
+    document.getElementById('phaseSel').value = state.phase.nom;
+    document.getElementById('opDate').value = state.phase.opDate || '';
+  }
+}
+function savePhase(){
+  state.phase = {
+    nom: document.getElementById('phaseSel').value,
+    opDate: document.getElementById('opDate').value || null
+  };
+  document.getElementById('phaseEdit').style.display = 'none';
+  save();
+}
+function renderPhase(){
+  const m = PHASE_META[state.phase.nom] || PHASE_META.preop;
+  document.getElementById('phaseLabel').textContent = m.nom;
+  let sub = m.note;
+  if(state.phase.opDate){
+    const j = Math.round((new Date(state.phase.opDate) - new Date().setHours(0,0,0,0)) / 86400000);
+    if(j > 0)  sub = `J−${j} avant l'opération · ${m.note}`;
+    if(j === 0) sub = `Opération aujourd'hui · ${m.note}`;
+    if(j < 0)  sub = `J+${-j} après l'opération · ${m.note}`;
+  }
+  document.getElementById('phaseSub').textContent = sub;
+}
+
+// ---------- COPIER MA SITUATION (rituel du dimanche) ----------
+function buildSituation(){
+  const L = [];
+  const acwr = computeACWR();
+  const m = PHASE_META[state.phase.nom] || PHASE_META.preop;
+
+  L.push('=== MA SITUATION ===');
+  L.push('Date : ' + new Date().toLocaleDateString('fr-FR'));
+  L.push('Phase : ' + m.nom + (state.phase.opDate ? ' (opération le ' + new Date(state.phase.opDate).toLocaleDateString('fr-FR') + ')' : ''));
+  L.push('ACWR : ' + (acwr===null ? 'pas assez de données' : acwr.toFixed(2)));
+
+  // 7 derniers jours
+  const now = Date.now(), day = 86400000;
+  const recentes = state.entries
+    .filter(e => now - new Date(e.date).getTime() <= 7*day)
+    .sort((a,b)=> new Date(a.date)-new Date(b.date));
+
+  L.push('');
+  L.push('--- Séances des 7 derniers jours ---');
+  if(!recentes.length) L.push('Aucune séance enregistrée.');
+  recentes.forEach(e=>{
+    const d = new Date(e.date).toLocaleDateString('fr-FR',{weekday:'short', day:'2-digit', month:'2-digit'});
+    const meta = TYPE_META[e.type] ? TYPE_META[e.type].nom : e.type;
+    let l = `${d} · ${meta} · ${e.duree} min · RPE ${e.rpe} · charge ${Math.round(e.load)}`;
+    if(e.deniv) l += ` · ${e.deniv} m D+`;
+    if(e.mur)   l += ` · ${e.mur}`;
+    if(e.note)  l += ` · "${e.note}"`;
+    L.push(l);
+  });
+  const totalSem = recentes.reduce((s,e)=>s+e.load,0);
+  L.push('Charge totale 7 jours : ' + Math.round(totalSem));
+
+  // douleurs
+  L.push('');
+  L.push('(Douleurs : je réponds dans le chat si j\'ai des gênes cette semaine.)')
+
+  // ce qui était prévu mais pas fait
+  const debutSem = dayKey(weekStart(0));
+  const finSem = dayKey(weekDays(0)[6]);
+  const prevus = state.plans.filter(p => p.day >= debutSem && p.day <= finSem);
+  L.push('');
+  L.push('--- Prévu cette semaine ---');
+  if(!prevus.length) L.push('Rien de planifié.');
+  prevus.forEach(p=>{
+    const meta = TYPE_META[p.type] ? TYPE_META[p.type].nom : p.type;
+    L.push(`${p.day} · ${meta} · ${p.duree} min${p.note? ' · '+p.note : ''}`);
+  });
+
+  L.push('');
+  L.push('Génère-moi la semaine à venir : séances, renfo, étirements, et les recettes (dîners en semaine, déjeuner + dîner le week-end, conseils pour les midis au bureau).');
+  return L.join('\n');
+}
+
+function copySituation(){
+  const txt = buildSituation();
+  const done = ()=>{
+    const b = document.getElementById('btnSituation');
+    const old = b.textContent;
+    b.textContent = '✓ Copié — colle-le dans Claude';
+    setTimeout(()=>{ b.textContent = old; }, 2500);
+  };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt, done));
+  } else fallbackCopy(txt, done);
+}
+function fallbackCopy(txt, done){
+  const ta = document.createElement('textarea');
+  ta.value = txt;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); done(); }
+  catch(e){ alert('Copie impossible. Sélectionne le texte manuellement :\n\n' + txt); }
+  document.body.removeChild(ta);
+}
+
+// ---------- IMPORTER UN PLAN ----------
+function openPlanImport(){
+  const zone = document.getElementById('planImportZone');
+  zone.style.display = zone.style.display==='none' ? 'block' : 'none';
+}
+function applyPlan(){
+  const txt = document.getElementById('planPaste').value.trim();
+  if(!txt){ alert('Colle d\'abord le plan.'); return; }
+  let data;
+  try{ data = JSON.parse(txt); }
+  catch(e){ alert('Format non reconnu. Le plan doit être au format JSON.'); return; }
+  const arr = Array.isArray(data) ? data : data.plans;
+  if(!Array.isArray(arr)){ alert('Format non reconnu : liste de séances attendue.'); return; }
+
+  const valides = arr.filter(p => p.day && p.type && p.duree);
+  if(!valides.length){ alert('Aucune séance valide trouvée dans le plan.'); return; }
+
+  // remplace le planning des jours concernés
+  const jours = [...new Set(valides.map(p=>p.day))];
+  state.plans = state.plans.filter(p => !jours.includes(p.day));
+  valides.forEach((p,i)=>{
+    state.plans.push({
+      id: Date.now()+i,
+      day: p.day, type: p.type,
+      duree: parseFloat(p.duree),
+      note: p.note || ''
+    });
+  });
+  document.getElementById('planPaste').value = '';
+  document.getElementById('planImportZone').style.display = 'none';
+  save();
+  document.querySelector('.tab[data-tab="week"]').click();
+  alert(valides.length + ' séance(s) ajoutée(s) au planning.');
+}
+
+// ---------- RATTACHER UN FICHIER SUUNTO A UNE SEANCE PREVUE ----------
+let attachPlanId = null;
+
+function attachSuunto(planId){
+  attachPlanId = planId;
+  document.getElementById('attachFile').click();
+}
+
+async function handleAttach(ev){
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if(!file || attachPlanId===null) return;
+
+  const plan = state.plans.find(p=>p.id===attachPlanId);
+  if(!plan){ attachPlanId = null; return; }
+
+  let h;
+  try{
+    const data = JSON.parse(await readFileAsText(file));
+    h = data.DeviceLog && data.DeviceLog.Header;
+  }catch(e){ /* h reste undefined */ }
+
+  if(!h){
+    alert('Fichier non reconnu. Il doit s\'agir d\'un export Suunto (.json).');
+    attachPlanId = null;
+    return;
+  }
+
+  const duree = Math.round((h.Duration||0)/60);
+  if(!duree){
+    alert('Durée introuvable dans ce fichier.');
+    attachPlanId = null;
+    return;
+  }
+  const rpe = h.PeakTrainingEffect
+    ? Math.min(10, Math.max(1, Math.round(h.PeakTrainingEffect*2)))
+    : 5;
+
+  // la date du fichier fait foi ; sinon on retombe sur le jour prévu
+  const date = h.DateTime || (plan.day + 'T12:00:00');
+
+  const entry = {
+    id: Date.now(),
+    date,
+    type: plan.type,
+    duree, rpe,
+    load: duree * rpe,
+    note: plan.note || ''
+  };
+  if(plan.type==='trail') entry.deniv = Math.round(h.Ascent||0);
+
+  state.entries.push(entry);
+  state.plans = state.plans.filter(p=>p.id!==attachPlanId);
+  attachPlanId = null;
+  save();
+}
+
+// ---------- SEMAINE / PLANNING ----------
+if(!state.plans) state.plans = [];
+
+const DAY_LABELS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+const TYPE_META = {
+  trail:    {ico:'🏔️', nom:'Trail'},
+  escalade: {ico:'🧗', nom:'Escalade'},
+  renfo:    {ico:'💪', nom:'Renforcement'},
+  recup:    {ico:'🧘', nom:'Récup / étirements'},
+  velo:     {ico:'🚲', nom:'Vélo boulot'}
+};
+const VELO_KM = 10;
+let weekOffset = 0;
+
+// clé locale AAAA-MM-JJ (évite les décalages de fuseau)
+function dayKey(d){
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+// lundi de la semaine affichée
+function weekStart(offset){
+  const d = new Date(); d.setHours(0,0,0,0);
+  const shift = (d.getDay()+6)%7; // dimanche=0 -> 6
+  d.setDate(d.getDate()-shift + offset*7);
+  return d;
+}
+function weekDays(offset){
+  const start = weekStart(offset);
+  return Array.from({length:7}, (_,i)=>{
+    const d = new Date(start); d.setDate(start.getDate()+i); return d;
+  });
+}
+
+function shiftWeek(n){ weekOffset += n; renderWeek(); }
+
+function fillPlanDaySelect(){
+  const sel = document.getElementById('planDay');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  weekDays(weekOffset).forEach((d,i)=>{
+    const o = document.createElement('option');
+    o.value = dayKey(d);
+    o.textContent = DAY_LABELS[i]+' '+d.getDate()+'/'+(d.getMonth()+1);
+    sel.appendChild(o);
+  });
+  if([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+}
+
+function addPlan(){
+  const duree = parseFloat(document.getElementById('planDuree').value);
+  if(!duree || duree<=0){ alert('Indique une durée prévue.'); return; }
+  state.plans.push({
+    id: Date.now(),
+    day: document.getElementById('planDay').value,
+    type: document.getElementById('planType').value,
+    duree,
+    note: document.getElementById('planNote').value || ''
+  });
+  document.getElementById('planDuree').value='';
+  document.getElementById('planNote').value='';
+  save();
+}
+function delPlan(id){
+  state.plans = state.plans.filter(p=>p.id!==id);
+  save();
+}
+
+function renderWeek(){
+  fillPlanDaySelect();
+  const days = weekDays(weekOffset);
+  const todayK = dayKey(new Date());
+
+  // titre
+  const f = d => d.getDate()+'/'+(d.getMonth()+1);
+  let titre = f(days[0])+' — '+f(days[6]);
+  if(weekOffset===0) titre = 'Cette semaine · '+titre;
+  else if(weekOffset===-1) titre = 'Semaine dernière · '+titre;
+  else if(weekOffset===1) titre = 'Semaine prochaine · '+titre;
+  document.getElementById('weekTitle').textContent = titre;
+
+  // jours
+  const wrap = document.getElementById('weekDays');
+  wrap.innerHTML = '';
+  let nbFait = 0, chargeSem = 0, kmVelo = 0;
+
+  days.forEach((d,i)=>{
+    const k = dayKey(d);
+    const card = document.createElement('div');
+    card.className = 'day-card' + (k===todayK ? ' is-today' : '');
+
+    let slots = '';
+
+    // vélo boulot lundi->jeudi (déplacement, hors charge)
+    if(i<=3){
+      kmVelo += VELO_KM;
+      slots += `<div class="slot">
+        <span class="ico">🚲</span>
+        <div class="txt">Vélo boulot<small>${VELO_KM} km aller-retour</small></div>
+        <span class="st st-commute">Déplacement</span>
+      </div>`;
+    }
+
+    // séances réalisées ce jour
+    state.entries.filter(e=>{
+      const ed = new Date(e.date); ed.setHours(0,0,0,0);
+      return dayKey(ed)===k;
+    }).forEach(e=>{
+      nbFait++; chargeSem += e.load;
+      const m = TYPE_META[e.type] || {ico:'•', nom:e.type};
+      slots += `<div class="slot">
+        <span class="ico">${m.ico}</span>
+        <div class="txt">${m.nom}<small>${e.duree} min · RPE ${e.rpe} · charge ${Math.round(e.load)}</small></div>
+        <span class="st st-done">Fait</span>
+      </div>`;
+    });
+
+    // séances planifiées ce jour
+    state.plans.filter(p=>p.day===k).forEach(p=>{
+      const m = TYPE_META[p.type] || {ico:'•', nom:p.type};
+      slots += `<div class="slot">
+        <span class="ico">${m.ico}</span>
+        <div class="txt">${m.nom}<small>${p.duree} min prévues${p.note? ' · '+p.note : ''}</small></div>
+        <button class="attach" onclick="attachSuunto(${p.id})" title="Rattacher le fichier Suunto">📎 Suunto</button>
+        <button class="x" onclick="delPlan(${p.id})">✕</button>
+      </div>`;
+    });
+
+    if(!slots) slots = '<div class="day-empty">Repos</div>';
+
+    card.innerHTML = `<div class="day-head"><span>${DAY_LABELS[i]}</span><span class="dl">${d.getDate()}/${d.getMonth()+1}</span></div>${slots}`;
+    wrap.appendChild(card);
+  });
+
+  // stats de la semaine
+  document.getElementById('weekStats').innerHTML = `
+    <div><b>${nbFait}</b><span>Séances</span></div>
+    <div><b>${Math.round(chargeSem)}</b><span>Charge</span></div>
+    <div><b>${kmVelo}</b><span>km vélo</span></div>`;
 }
 
 // ---------- ACWR ----------
@@ -448,46 +926,6 @@ function updateGauge(){
   }
 }
 
-// ---------- ZONES ----------
-const zoneNames = {cervicales:'Cervicales', loge_g:'Loge gauche', loge_d:'Loge droite', avantbras:'Avant-bras / doigts'};
-document.querySelectorAll('[data-zone]').forEach(el=>{
-  if(el.classList.contains('pain-scale')){
-    const zone = el.dataset.zone;
-    for(let i=0;i<=5;i++){
-      const d = document.createElement('div');
-      d.textContent = '';
-      d.title = i;
-      d.style.background = i===0 ? '#DDD' : `rgba(166,75,60,${0.15+i*0.15})`;
-      d.onclick = ()=>{ state.pain[zone] = {level:i, date:new Date().toISOString()}; save(); };
-      el.appendChild(d);
-    }
-  }
-});
-document.querySelectorAll('.zone-hit').forEach(el=>{
-  el.onclick = ()=>{
-    document.querySelector('.tab[data-tab="zones"]').click();
-    document.querySelector(`.pain-scale[data-zone="${el.dataset.zone}"]`).scrollIntoView({behavior:'smooth', block:'center'});
-  };
-});
-
-function renderZones(){
-  const wrap = document.getElementById('zonesSummary');
-  wrap.innerHTML = '';
-  const keys = Object.keys(zoneNames);
-  let any = false;
-  keys.forEach(k=>{
-    const p = state.pain[k];
-    if(!p) return;
-    any = true;
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px;';
-    const d = new Date(p.date).toLocaleDateString('fr-FR');
-    row.innerHTML = `<span>${zoneNames[k]}</span><span><b>${p.level}/5</b> · <span style="color:var(--ink-soft)">${d}</span></span>`;
-    wrap.appendChild(row);
-  });
-  if(!any) wrap.innerHTML = '<p class="empty">Aucune douleur enregistrée. Clique une zone ci-dessus.</p>';
-}
-
 // ---------- HISTORY LIST ----------
 function renderHistory(){
   const list = document.getElementById('historyList');
@@ -550,32 +988,11 @@ function renderChart(){
   });
 }
 
-// ---------- EXPORT / IMPORT ----------
-function exportData(){
-  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'charge-tracker-'+new Date().toISOString().slice(0,10)+'.json';
-  a.click();
-}
-function importData(ev){
-  const file = ev.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const data = JSON.parse(reader.result);
-      if(data.entries && data.pain){ state = data; save(); alert('Import réussi.'); }
-      else alert('Fichier invalide.');
-    }catch(e){ alert('Erreur de lecture du fichier.'); }
-  };
-  reader.readAsText(file);
-}
-
 // ---------- RENDER ALL ----------
 function render(){
+  renderPhase();
   updateGauge();
-  renderZones();
+  renderWeek();
   renderHistory();
   renderChart();
 }
