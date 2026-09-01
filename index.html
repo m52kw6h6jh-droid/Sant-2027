@@ -189,6 +189,14 @@
   }
   .slot .attach:active{ opacity:0.7; }
   .day-empty{ font-size:13px; color:var(--ink-soft); padding:4px 0; }
+
+  .recipes-content h4{ font-size:13px; margin:14px 0 6px; color:var(--moss); text-transform:uppercase; letter-spacing:0.04em; }
+  .recipes-content h4:first-child{ margin-top:0; }
+  .recipes-content p{ margin:0 0 8px; font-size:14px; }
+  .recipes-content ul{ margin:0 0 10px; padding-left:18px; }
+  .recipes-content li{ font-size:14px; margin-bottom:4px; }
+  .recipes-content a{ color:var(--slate); }
+  .slot .txt small a{ color:var(--slate); }
 </style>
 </head>
 <body>
@@ -282,6 +290,12 @@
     </div>
 
     <div id="weekDays"></div>
+
+    <div class="card" id="weekRecipesCard" style="display:none;">
+      <h3 style="font-size:14px; margin-bottom:4px;">🍽️ Recettes de la semaine</h3>
+      <div id="weekRecipesContent" class="recipes-content"></div>
+    </div>
+
     <input type="file" id="attachFile" accept="application/json" style="display:none" onchange="handleAttach(event)">
 
     <div class="info-box">Le vélo boulot (10 km, lun–jeu) s'affiche automatiquement. Il compte comme déplacement régulier, pas comme charge d'entraînement — sinon il masquerait les vraies hausses de charge.</div>
@@ -597,7 +611,10 @@ function buildSituation(){
   });
 
   L.push('');
-  L.push('Génère-moi la semaine à venir : séances, renfo, étirements, et les recettes (dîners en semaine, déjeuner + dîner le week-end, conseils pour les midis au bureau).');
+  L.push('Génère-moi la semaine à venir en te comportant comme un vrai coach complet (prépa physique + physio + diététicien) :');
+  L.push('- séances (trail, escalade, renfo, récup) ; pour chaque exercice de renfo, donne des consignes très claires (séries/répétitions/tempo/points de vigilance) OU un lien vidéo YouTube démonstratif');
+  L.push('- recettes (dîners en semaine, déjeuner + dîner le week-end, conseils pour les midis au bureau)');
+  L.push('Réponds avec un seul bloc JSON au format {"plans":[{"day":"AAAA-MM-JJ","type":"trail|escalade|renfo|recup","duree":60,"note":"..."}],"recettes":"## Titre\\n- item\\n..."} prêt à coller dans "Importer un plan".');
   return L.join('\n');
 }
 
@@ -652,6 +669,11 @@ function applyPlan(){
       note: p.note || ''
     });
   });
+  // recettes associees a la semaine importee
+  if(!Array.isArray(data) && typeof data.recettes === 'string' && data.recettes.trim()){
+    state.recettes[mondayKeyOf(jours[0])] = data.recettes.trim();
+  }
+
   document.getElementById('planPaste').value = '';
   document.getElementById('planImportZone').style.display = 'none';
   save();
@@ -718,6 +740,46 @@ async function handleAttach(ev){
 
 // ---------- SEMAINE / PLANNING ----------
 if(!state.plans) state.plans = [];
+if(!state.recettes) state.recettes = {};
+
+// ---------- AFFICHAGE SECURISE (echappement + liens cliquables) ----------
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function linkify(s){
+  return s.replace(/(https?:\/\/[^\s<]+)/g, url => `<a href="${url}" target="_blank" rel="noopener">${url.includes('youtu') ? '▶️ Voir la vidéo' : url}</a>`);
+}
+function renderNote(note){
+  if(!note) return '';
+  return linkify(escapeHtml(note));
+}
+function renderRecettes(text){
+  const lines = String(text).split('\n');
+  let html = '', inList = false;
+  const closeList = ()=>{ if(inList){ html+='</ul>'; inList=false; } };
+  lines.forEach(raw=>{
+    const line = raw.trim();
+    if(!line){ closeList(); return; }
+    if(line.startsWith('## ')){
+      closeList();
+      html += `<h4>${linkify(escapeHtml(line.slice(3)))}</h4>`;
+    } else if(line.startsWith('- ')){
+      if(!inList){ html+='<ul>'; inList=true; }
+      html += `<li>${linkify(escapeHtml(line.slice(2)))}</li>`;
+    } else {
+      closeList();
+      html += `<p>${linkify(escapeHtml(line))}</p>`;
+    }
+  });
+  closeList();
+  return html;
+}
+function mondayKeyOf(dayStr){
+  const [y,m,d] = dayStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate() - (dt.getDay()+6)%7);
+  return dayKey(dt);
+}
 
 const DAY_LABELS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const TYPE_META = {
@@ -837,7 +899,7 @@ function renderWeek(){
       const m = TYPE_META[p.type] || {ico:'•', nom:p.type};
       slots += `<div class="slot">
         <span class="ico">${m.ico}</span>
-        <div class="txt">${m.nom}<small>${p.duree} min prévues${p.note? ' · '+p.note : ''}</small></div>
+        <div class="txt">${m.nom}<small>${p.duree} min prévues${p.note? ' · '+renderNote(p.note) : ''}</small></div>
         <button class="attach" onclick="attachSuunto(${p.id})" title="Rattacher le fichier Suunto">📎 Suunto</button>
         <button class="x" onclick="delPlan(${p.id})">✕</button>
       </div>`;
@@ -854,6 +916,18 @@ function renderWeek(){
     <div><b>${nbFait}</b><span>Séances</span></div>
     <div><b>${Math.round(chargeSem)}</b><span>Charge</span></div>
     <div><b>${kmVelo}</b><span>km vélo</span></div>`;
+
+  // recettes de la semaine affichée
+  const rcCard = document.getElementById('weekRecipesCard');
+  const rcContent = document.getElementById('weekRecipesContent');
+  const recette = state.recettes[dayKey(days[0])];
+  if(recette){
+    rcCard.style.display = '';
+    rcContent.innerHTML = renderRecettes(recette);
+  } else {
+    rcCard.style.display = 'none';
+    rcContent.innerHTML = '';
+  }
 }
 
 // ---------- ACWR ----------
